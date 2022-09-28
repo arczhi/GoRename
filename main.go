@@ -13,16 +13,22 @@ import (
 	"time"
 )
 
-//"./WAIT_TO_RENAME"
+//一些变量
 var (
-	myFolder     string //待处理目录
-	id           string //学号
-	class        string //班级
-	peopleName   string //姓名
-	chapter      string //作业章节
-	formatChoice string //格式
-	WG           sync.WaitGroup
+	myFolder     string         //待处理目录
+	id           string         //学号
+	class        string         //班级
+	peopleName   string         //姓名
+	chapter      string         //作业章节
+	formatChoice string         //格式
+	WG           sync.WaitGroup //设置WaitGroup,保证协程全部退出后main再退出
 )
+
+//带有读写锁的map
+type RWmap struct {
+	sync.Mutex //锁
+	m          map[string]string
+}
 
 func main() {
 
@@ -62,6 +68,7 @@ func main() {
 	files, err := ioutil.ReadDir(myFolder)
 	if err != nil {
 		log.Fatal("【ERROR】目录读取失败，请检查目录路径\n", err)
+		time.Sleep(60 * time.Second)
 	}
 
 	for _, file := range files {
@@ -73,34 +80,45 @@ func main() {
 		go func() {
 			//退出前关闭一个wg
 			defer WG.Done()
-			//fmt.Println(f.Name())
+
 			//属于文件，先进行匹配查询，查询成功则重命名
 			var ok bool
 			peopleName, id, ok = Check.NameCheck(f.Name())
 			if ok {
 
-				var format = map[string]string{
+				//fmt.Println(format)
+
+				//新旧文件路径
+				oldPath := fmt.Sprintf("%v/%v", myFolder, f.Name())
+
+				format := RWmap{}
+
+				//上锁
+				format.Lock()
+
+				//作业格式
+				format.m = map[string]string{
 					"0": id,
 					"1": peopleName,
 					"2": class,
 					"3": chapter,
 				}
 
-				//fmt.Println(format)
-
-				//新旧文件路径
-				oldPath := fmt.Sprintf("%v/%v", myFolder, f.Name())
 				newPath := fmt.Sprintf("%v/%v %v %v %v %v", myFolder,
-					format[strings.Split(formatChoice, "")[0]],
-					format[strings.Split(formatChoice, "")[1]],
-					format[strings.Split(formatChoice, "")[2]],
-					format[strings.Split(formatChoice, "")[3]],
+					format.m[strings.Split(formatChoice, "")[0]],
+					format.m[strings.Split(formatChoice, "")[1]],
+					format.m[strings.Split(formatChoice, "")[2]],
+					format.m[strings.Split(formatChoice, "")[3]],
 					path.Ext(oldPath))
+
 				//重命名
 				err := os.Rename(oldPath, newPath)
 				if err != nil {
 					fmt.Println(err)
 				}
+
+				//解锁
+				format.Unlock()
 			}
 
 		}()
