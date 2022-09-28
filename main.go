@@ -24,8 +24,8 @@ var (
 	WG           sync.WaitGroup //设置WaitGroup,保证协程全部退出后main再退出
 )
 
-//带有读写锁的map
-type RWmap struct {
+//带有锁的map
+type LockMap struct {
 	sync.Mutex //锁
 	m          map[string]string
 }
@@ -91,7 +91,7 @@ func main() {
 				//新旧文件路径
 				oldPath := fmt.Sprintf("%v/%v", myFolder, f.Name())
 
-				format := RWmap{}
+				format := LockMap{}
 
 				//上锁
 				format.Lock()
